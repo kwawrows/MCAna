@@ -117,9 +117,7 @@ private:
   void ResetVariables();
   long unsigned int WhichGeneratorType(int TrID); 
   void FillMaps(std::map<int, simb::MCParticle> &MyMap, art::FindManyP<simb::MCParticle> Assn, art::ValidHandle<std::vector<simb::MCTruth>> Hand); 
-  bool InMap(int TrID, std::map< int, simb::MCParticle> ParMap);
-  bool InMap(int TrID, std::map<int, float> TrackIDMap); 
-
+ 
   //--- Root Tree ---
   TTree *fTree; 
 
@@ -485,92 +483,89 @@ void dune::EventAnaTree::analyze(art::Event const& e)
     } //if MC particles are valid 
 
     //----------------------- LarSoft ::  hit list -------------------------- 
-    //art::ValidHandle<std::vector <recob::Hit> > recoHits = e.getValidHandle<std::vector <recob::Hit> >(fHitLabel);
-    std::vector< art::Ptr<recob::Hit> >recoHits; 
+    std::vector< art::Ptr<recob::Hit> > recoHits; 
     auto RecoHitHandle = e.getValidHandle<std::vector<recob::Hit>>(fHitLabel); // art handle for the reco hits 
-    if(RecoHitHandle){ art::fill_ptr_vector(recoHits, RecoHitHandle); }
+    if (RecoHitHandle) { 
+      art::fill_ptr_vector(recoHits, RecoHitHandle); 
+    }
 
-    //Run over the reco hits 
-    if ( RecoHitHandle ){
+    // Run over the reco hits 
+    if (RecoHitHandle) {
       fnHits = recoHits.size();
       fnColHits = 0;
-      
-      for (unsigned int hit = 0; hit < recoHits.size(); ++hit){
-        //const recob::Hit thisHit = recoHits->at(hit);
-        const art::Ptr<recob::Hit> thisHit = recoHits.at(hit);
+    
+      for (unsigned int hit = 0; hit < recoHits.size(); ++hit) {
+        
+        const recob::Hit& thisHit = *recoHits.at(hit);  
 
-        fhit_tpc.push_back(thisHit->WireID().TPC);
-        fhit_channel.push_back(thisHit->Channel());
-        fhit_time.push_back(thisHit->PeakTime());
-        fhit_SADC.push_back(thisHit->SummedADC());
-        fhit_wire.push_back(thisHit->WireID().Wire);
-        fhit_charge.push_back(thisHit->Integral());
-        fhit_plane.push_back(thisHit->View());
-        fhit_width.push_back( std::abs( thisHit->PeakTimePlusRMS() - thisHit->PeakTimeMinusRMS()) ); 
-        fhit_TOT.push_back(thisHit->EndTick() - thisHit->StartTick()); // time over threshold in ticks 
+        fhit_tpc.push_back(thisHit.WireID().TPC);
+        fhit_channel.push_back(thisHit.Channel());
+        fhit_time.push_back(thisHit.PeakTime());
+        fhit_SADC.push_back(thisHit.SummedADC());
+        fhit_wire.push_back(thisHit.WireID().Wire);
+        fhit_charge.push_back(thisHit.Integral());
+        fhit_plane.push_back(thisHit.View());
+        fhit_width.push_back(std::abs(thisHit.PeakTimePlusRMS() - thisHit.PeakTimeMinusRMS()));
+        fhit_TOT.push_back(thisHit.EndTick() - thisHit.StartTick()); // time over threshold in ticks
         // 1 tick = 500 ns (2 MHz sampling frequency)
 
-        // extracting physical position of the hit in detector geometry  {
+        // extracting xyz position of the hit in detector geometry
         std::vector<const sim::IDE*> ides;
-        try{ ides = bt_serv->HitToSimIDEs_Ps(clockData,thisHit); }
-        catch(...){}
-        if (ides.size() > 0){
-          //getting physical coordinates of hit from ides 
+        try {
+          ides = bt_serv->HitToSimIDEs_Ps(clockData, thisHit);
+        } catch (...) {}
+        if (ides.size() > 0) {
+          // getting physical coordinates of hit from ides
           std::vector<double> xyz = bt_serv->SimIDEsToXYZ(ides);
           fhit_trueX.push_back(xyz[0]);
           fhit_trueY.push_back(xyz[1]);
           fhit_trueZ.push_back(xyz[2]);
         }
 
-
-        if (thisHit->View() == 2){  //collection plane hits only
-          fnColHits +=1;   
-          fcolhit_tpc.push_back(thisHit->WireID().TPC);
-          fcolhit_channel.push_back(thisHit->Channel());
-          fcolhit_time.push_back(thisHit->PeakTime());
-          fcolhit_SADC.push_back(thisHit->SummedADC());
-          fcolhit_wire.push_back(thisHit->WireID().Wire);
-          fcolhit_charge.push_back(thisHit->Integral());
-          fcolhit_width.push_back( std::abs( thisHit->PeakTimePlusRMS() - thisHit->PeakTimeMinusRMS()) );
+        if (thisHit.View() == 2) {  // collection plane hits only
+          fnColHits += 1;   
+          fcolhit_tpc.push_back(thisHit.WireID().TPC);
+          fcolhit_channel.push_back(thisHit.Channel());
+          fcolhit_time.push_back(thisHit.PeakTime());
+          fcolhit_SADC.push_back(thisHit.SummedADC());
+          fcolhit_wire.push_back(thisHit.WireID().Wire);
+          fcolhit_charge.push_back(thisHit.Integral());
+          fcolhit_width.push_back(std::abs(thisHit.PeakTimePlusRMS() - thisHit.PeakTimeMinusRMS()));
           std::vector<const sim::IDE*> ColIDES;
-          try{
-            ColIDES = bt_serv->HitToSimIDEs_Ps(clockData,thisHit);
-          }
-          catch(...){}
-          if (ColIDES.size() > 0){
+          try {
+            ColIDES = bt_serv->HitToSimIDEs_Ps(clockData, thisHit);
+          } catch (...) {}
+          if (ColIDES.size() > 0) {
             std::vector<double> colxyz = bt_serv->SimIDEsToXYZ(ColIDES);
             fcolhit_trueX.push_back(colxyz[0]);
             fcolhit_trueY.push_back(colxyz[1]);
             fcolhit_trueZ.push_back(colxyz[2]);
-          } // hit XYZ : ides > 0 
-          
-          //tag the collection hits 
-          std::vector<sim::TrackIDE> hitTrkIDE = bt_serv-> HitToTrackIDEs(clockData, thisHit); 
+          } // hit XYZ: ides > 0
+            
+          // tag the collection hits 
+          std::vector<sim::TrackIDE> hitTrkIDE = bt_serv->HitToTrackIDEs(clockData, thisHit); 
           double MainTrkID = -1; 
           double TopEFrac  = 0; 
-          
-          //Loop over IDEs 
-          for (size_t ideL = 0; ideL < hitTrkIDE.size(); ++ideL)
-            {
-              if (hitTrkIDE[ideL].energyFrac > TopEFrac)
-                {
-                  TopEFrac = hitTrkIDE[ideL].energyFrac;
-                  MainTrkID = abs(hitTrkIDE[ideL].trackID); // HERE
-                }
+            
+          // Loop over IDEs 
+          for (size_t ideL = 0; ideL < hitTrkIDE.size(); ++ideL) {
+            if (hitTrkIDE[ideL].energyFrac > TopEFrac) {
+              TopEFrac = hitTrkIDE[ideL].energyFrac;
+              MainTrkID = std::abs(hitTrkIDE[ideL].trackID); // HERE
             }
-          
+          }
+            
           // Default value for the generator label index
           int labelIndex = -1;
-          
+            
           // Check if MainTrkID exists in the map and get its generator label index
-          if (MainTrkID != -1)
-            {
-              labelIndex = WhichGeneratorType( MainTrkID);
-            }
+          if (MainTrkID != -1) {
+            labelIndex = WhichGeneratorType(MainTrkID);
+          }
           fcolhit_label.push_back(labelIndex); // which generator produced this hit: 0 = marley, 1+.. = radiologicals, -1 = noise (or something went wrong)
-        } // col hits 
+        } // collection hits
       } // run over all hits
-    } //if reco hits valid     
+    } // if reco hits valid
   }//if is MC
   
 
@@ -689,55 +684,32 @@ void dune::EventAnaTree::endJob()
 //Function which returns the type of generator particle which produced a given MC truth 
 long unsigned int dune::EventAnaTree::WhichGeneratorType(int TrID)
 {
-  for (long unsigned int i = 0; i < fLabels.size(); i++)
-    {
-      if (InMap(TrID, GeneratorParticles[i]))
-        {
-          return i + 1;
-        }
+  for (long unsigned int i = 0; i < fLabels.size(); i++) {
+
+    //check if given track ID is in our map
+    if (GeneratorParticles[i].find(TrID) != GeneratorParticles[i].end()) { 
+      return i + 1;
     }
+  }
   return 0;
 }
 
  
 //Function to fill a map with MCparticles from a given MCTruth 
-void dune::EventAnaTree::FillMaps(std::map<int, simb::MCParticle> &MyMap, art::FindManyP<simb::MCParticle> Assn, art::ValidHandle<std::vector<simb::MCTruth>> Hand)
+void dune::EventAnaTree::FillMaps(std::map<int, simb::MCParticle> &MyMap, 
+                                  art::FindManyP<simb::MCParticle> Assn, 
+                                  art::ValidHandle<std::vector<simb::MCTruth>> Hand)
 {
-  for (size_t L1 = 0; L1 < Hand->size(); ++L1)
+  for (size_t L1 = 0; L1 < Hand->size(); ++L1) 
     {
-      for (size_t L2 = 0; L2 < Assn.at(L1).size(); ++L2)
+      for (const auto& MCParticlePtr : Assn.at(L1)) 
         {
-          const simb::MCParticle ThisPar = (*Assn.at(L1).at(L2));
-          MyMap[abs(ThisPar.TrackId())] = ThisPar;
+          const simb::MCParticle& ThisPar = *MCParticlePtr;
+          MyMap[std::abs(ThisPar.TrackId())] = ThisPar;
         }
     }
-  return;
 }
 
-// Function to check if a given trackID is in a given map 
-bool dune::EventAnaTree::InMap( int TrID, std::map<int, simb::MCParticle> ParMap)
-{
-  std::map<int, simb::MCParticle>::iterator Particle;
-  Particle = ParMap.find(TrID);
-  if (Particle != ParMap.end())
-    {
-      return true;
-    }
-  else
-    return false;
-}
-
-bool dune::EventAnaTree::InMap( int TrID, std::map<int, float> TrackIDMap)
-{
-  std::map<int, float>::iterator Particle;
-  Particle = TrackIDMap.find(TrID);
-  if (Particle != TrackIDMap.end())
-    {
-      return true;
-    }
-  else
-    return false;
-}
 
 
 DEFINE_ART_MODULE(dune::EventAnaTree)
