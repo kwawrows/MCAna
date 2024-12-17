@@ -1,0 +1,54 @@
+#include "generator_labels.fcl"
+#include "services_dune.fcl"
+#include "trackfindermodules_dune.fcl"
+
+BEGIN_PROLOG
+
+eventanatree:
+ {
+  module_type:           "EventAnaTree"
+  GeneratorLabelVector:  @local::generator_dune10kt_1x2x6_centralAPA
+  GeantLabel:            "largeant"
+  TruthLabel:            "largeant"
+  HitLabel:              "gaushit" 
+  GenieLabel:            "generator"
+  SaveGenieInfo:         false 
+ } 
+
+END_PROLOG
+
+process_name: EventAnalysisTree
+
+source:
+{
+  module_type: RootInput
+  maxEvents:   -1
+}
+
+services:
+{
+ @table::dunefd_services
+ TFileService: {fileName : "ana_tree.root"}
+}
+
+physics:
+{
+  analyzers:
+  {
+  ana: @local::eventanatree
+  }
+  path0:     [ana]
+  end_paths: [path0]
+}
+
+
+services.Geometry: {
+    GDML: "dune10kt_v6_refactored_1x2x6.gdml"
+    Name: "dune10kt_v6_1x2x6"
+    ROOT: "dune10kt_v6_refactored_1x2x6.gdml"
+    SurfaceY: 147828
+    SortingParameters: {
+       ChannelsPerOpDet: 1
+   }
+   SurfaceY: 147828
+}
