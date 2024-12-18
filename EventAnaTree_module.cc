@@ -116,7 +116,8 @@ private:
   //--- Function definitions ---
   void ResetVariables();
   long unsigned int WhichGeneratorType(int TrID); 
-  void FillMaps(std::map<int, simb::MCParticle> &MyMap, art::FindManyP<simb::MCParticle> Assn, art::ValidHandle<std::vector<simb::MCTruth>> Hand); 
+  void FillMaps(std::map<int, simb::MCParticle> &MyMap, art::FindManyP<simb::MCParticle> Assn, art::ValidHandle<std::vector<simb::MCTr
+uth>> Hand); 
  
   //--- Root Tree ---
   TTree *fTree; 
@@ -124,7 +125,6 @@ private:
 
   // --- Fcl Configurables ---
   bool fSaveGenieInfo;
-  std::string fTruthLabel; //which module produced simulation
   std::string fHitLabel;
   std::string fGenieLabel;
   std::string fGeantLabel; //G4 label 
@@ -141,7 +141,6 @@ private:
 
   //Map for associating MC particles to their truth label 
   std::vector<std::map<int, simb::MCParticle>> GeneratorParticles = {}; 
-  std::vector<int> fNGenParts; // number of particles per generator type 
 
   //Genie / generator info
   unsigned int fgenie_no_primaries; 
@@ -189,6 +188,7 @@ private:
   std::vector<double>  fendX;
   std::vector<double>  fendY;
   std::vector<double>  fendZ;
+  std::vector<int>     flabel;
 
   //TPC info
   unsigned int fnHits; //number of hits 
@@ -232,7 +232,6 @@ dune::EventAnaTree::EventAnaTree(fhicl::ParameterSet const& p) :
   EDAnalyzer{p}//,
 {
   //Module label configs
-  fTruthLabel          = p.get<std::string>("TruthLabel");
   fHitLabel            = p.get<std::string>("HitLabel");
   fGenieLabel          = p.get<std::string>("GenieLabel");
   fGeantLabel          = p.get<std::string>("GeantLabel");
@@ -249,7 +248,6 @@ void dune::EventAnaTree::ResetVariables()
   fnPrimaries = fnGeantParticles = 0;
   fnHits = fnColHits = 0;
 
-  fNGenParts = {}; 
   GeneratorParticles = {}; 
     
   fgenie_primaries_pdg.clear();
@@ -293,6 +291,7 @@ void dune::EventAnaTree::ResetVariables()
   fendX.clear();
   fendY.clear();
   fendZ.clear();
+  flabel.clear();
 
 
   fhit_tpc.clear();
@@ -364,8 +363,6 @@ void dune::EventAnaTree::analyze(art::Event const& e)
           art::FindManyP<simb::MCParticle> Assn(LabelHandle, e, fGeantLabel); // Assign labels to MC particles 
           FillMaps(GeneratorParticles[l], Assn, LabelHandle);                 // Fill empty list with previously assigned particles
 
-          fNGenParts.push_back(GeneratorParticles[l].size()); // save number of particles for this generator 
-
           //Empty set for track IDs for current generator 
           std::set<int> ThisGeneratorIDs = {}; 
 
@@ -373,12 +370,38 @@ void dune::EventAnaTree::analyze(art::Event const& e)
           if (!GeneratorParticles[l].empty()){
 
             for (const auto& part : GeneratorParticles[l]){
+              //store the trackID - label mapping for hit tagging later 
               trackids.push_back(ThisGeneratorIDs);
               trackids[l].insert(part.first);
+              
+              //Save particle MC info 
+              const simb::MCParticle& mcPart = part.second;  
+
+              //with bgds looking at ~30k particles per event -- only save those that are potentially significant         
+              float Ek = (mcPart.E() - mcPart.Mass()) * 1000; // kinetic energy in MeV    
+              if (Ek > 0.05){
+                fTrackId.push_back(mcPart.TrackId());
+                fMother.push_back(mcPart.Mother());
+                fEng.push_back(mcPart.E());
+                fPdg.push_back(mcPart.PdgCode());
+                fEkin.push_back(mcPart.E() - mcPart.Mass());
+                fMass.push_back(mcPart.Mass());
+                fP.push_back(mcPart.P());
+                fPx.push_back(mcPart.Px());
+                fPy.push_back(mcPart.Py());
+                fPz.push_back(mcPart.Pz());
+                fND.push_back(mcPart.NumberDaughters());
+                fstartX.push_back(mcPart.Vx());
+                fstartY.push_back(mcPart.Vy());
+                fstartZ.push_back(mcPart.Vz());
+                fendX.push_back(mcPart.EndPosition()[0]);
+                fendY.push_back(mcPart.EndPosition()[1]);
+                fendZ.push_back(mcPart.EndPosition()[2]);
+                flabel.push_back(l + 1);
+              }//if Ek >50keV
             }
           } else{
             //Handle case of particle list is empty 
-            fNGenParts.push_back(0); 
             trackids.push_back(ThisGeneratorIDs); 
           }
         }
@@ -450,37 +473,6 @@ void dune::EventAnaTree::analyze(art::Event const& e)
 
     } // if SaveGenieInfo
 
-  
-    // ----------------------- GEANT :: truth list of MC particles -----------------------------------
-
-    art::ValidHandle<std::vector <simb::MCParticle> > mcParticles = e.getValidHandle<std::vector <simb::MCParticle> >(fTruthLabel);
-    if (mcParticles.isValid()){
-      fnPrimaries = mcParticles->size();
-      
-      //Get MC particle list from G4 
-      for (unsigned int t = 0; t < mcParticles->size(); ++t){ 
-        const simb::MCParticle trueParticle = mcParticles->at(t);
-
-        fTrackId.push_back( trueParticle.TrackId());
-        fMother.push_back( trueParticle.Mother());
-        fEng.push_back( trueParticle.E() );
-        fPdg.push_back( trueParticle.PdgCode());
-        fEkin.push_back( trueParticle.E() - trueParticle.Mass() );
-        fMass.push_back( trueParticle.Mass() );
-        fP.push_back( trueParticle.P()) ;
-        fPx.push_back( trueParticle.Px());
-        fPy.push_back( trueParticle.Py());
-        fPz.push_back( trueParticle.Pz());
-        fND.push_back( trueParticle.NumberDaughters());
-        fstartX.push_back( trueParticle.Vx());
-        fstartY.push_back( trueParticle.Vy());
-        fstartZ.push_back( trueParticle.Vz());
-        fendX.push_back( trueParticle.EndPosition()[0]);
-        fendY.push_back( trueParticle.EndPosition()[1]);
-        fendZ.push_back( trueParticle.EndPosition()[2]);
-
-      }
-    } //if MC particles are valid 
 
     //----------------------- LarSoft ::  hit list -------------------------- 
     std::vector< art::Ptr<recob::Hit> > recoHits; 
@@ -562,7 +554,8 @@ void dune::EventAnaTree::analyze(art::Event const& e)
           if (MainTrkID != -1) {
             labelIndex = WhichGeneratorType(MainTrkID);
           }
-          fcolhit_label.push_back(labelIndex); // which generator produced this hit: 0 = marley, 1+.. = radiologicals, -1 = noise (or something went wrong)
+          fcolhit_label.push_back(labelIndex); // which generator produced this hit: 0 = marley, 1+.. = radiologicals, -1 = noise (or 
+something went wrong)
         } // collection hits
       } // run over all hits
     } // if reco hits valid
@@ -619,7 +612,6 @@ void dune::EventAnaTree::beginJob()
 
   }
 
-  fTree->Branch("NGenParts", &fNGenParts); // number of g4 particles per generator 
   fTree->Branch("nGeantParticles",&fnGeantParticles,"nGeantParticles/i"); 
   fTree->Branch("nPrimaries",&fnPrimaries,"nPrimaries/i");
   fTree->Branch("TrackId",&fTrackId);
@@ -639,6 +631,7 @@ void dune::EventAnaTree::beginJob()
   fTree->Branch("endX",&fendX);
   fTree->Branch("endY",&fendY);
   fTree->Branch("endZ",&fendZ);
+  fTree->Branch("label",&flabel);
 
   fTree->Branch("nHits",&fnHits,"nHits/i");
   fTree->Branch("nColHits",&fnColHits,"nColHits/i");
